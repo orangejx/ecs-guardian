@@ -7,7 +7,7 @@ main.go                   入口：子命令分发（常驻 / monitor --once / r
 internal/
   aliyun/                 阿里云 API 客户端封装
     aliyun.go             ECS/BSS 服务包客户端 + CDT 的 RPC-2 签名直连
-  config/                 配置加载/校验/持久化（/data/config.json）
+  config/                 配置加载/校验/持久化（默认 data/config.json；环境变量优先）
   keeper/                 常驻调度器：每 5 分钟巡检 + 每日 09:00 日报
   monitor/                巡检与保活决策（核心）
   report/                 每日日报生成与发送
@@ -63,9 +63,16 @@ internal/
 - 巡检每 5 分钟；日报每日 09:00（容器时区 `TZ=Asia/Shanghai`）。
 - `SIGTERM`/`SIGINT` 优雅退出，状态文件先落盘再退。
 
-## 配置持久化（/data 卷）
+## 配置与日志目录
 
-- `config.json`：环境变量首次注入 / 挂载卷沿用 / `ALIYUN_MONITOR_FORCE_RECONFIG=1` 重建（先备份）。
-- `monitor_state.json`：巡检状态。
-- `bot_state.json`：机器人定时任务。
-- `*.log`：运行日志。
+数据与日志相互独立（环境变量可覆盖）：
+
+| 目录 | 环境变量 | 默认值 | 容器内路径 |
+|---|---|---|---|
+| 数据（config/状态） | `ALIYUN_MONITOR_DATA` | `data` | `/app/data` |
+| 日志 | `ALIYUN_MONITOR_LOGS` | `logs` | `/app/logs` |
+
+- `config.json`：优先由环境变量生成并写入（`ALIYUN_MONITOR_FORCE_RECONFIG=1` 强制重建）；无环境变量时读取该文件。
+- 日志按天分级：`<logs>/YYYYMM/DD.log` 与 `DD.error.log`；目录不可写时仅输出到控制台。
+- `<data>/monitor_state.json`：巡检状态（失败计数/通知冷却）。
+- `<data>/bot_state.json`：机器人定时任务。

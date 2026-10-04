@@ -14,9 +14,10 @@
 ## 快速开始（Docker）
 
 ```bash
-# 环境变量注入配置，/data 卷持久化
+# 环境变量注入配置；数据（config/状态）与日志分两个卷持久化
 docker run -d --name ecs-guardian --restart unless-stopped \
-  -v /var/lib/ecs-guardian:/data \
+  -v /var/lib/ecs-guardian/data:/app/data \
+  -v /var/lib/ecs-guardian/logs:/app/logs \
   -e TELEGRAM_BOT_TOKEN=123456:ABC \
   -e TELEGRAM_CHAT_ID=123456789 \
   -e 'ALIYUN_USERS=name=HK,ak=LTAI...,sk=...,region=cn-hongkong,instance_id=i-xxx,traffic_limit=180' \
@@ -24,18 +25,22 @@ docker run -d --name ecs-guardian --restart unless-stopped \
   orangejx/ecs-guardian:latest
 ```
 
-首次启动会把环境变量渲染成 `/data/config.json`；之后重建容器沿用卷内配置（设置 `ALIYUN_MONITOR_FORCE_RECONFIG=1` 可强制用环境变量重建）。配置、日志、状态文件全部保存在挂载卷。
+程序**优先使用环境变量**：只要设置了 `ALIYUN_USERS` 就用环境变量构建配置，并把结果写入 `<ALIYUN_MONITOR_DATA>/config.json` 持久化；未设置环境变量时回退读取该文件。重建容器后配置不丢失。
+
+镜像内布局：可执行文件在 `/usr/local/bin/ecs-guardian`，工作目录 `/app`，其中 `/app/data` 存配置与状态、`/app/logs` 存日志。
 
 ### 环境变量
 
-| 变量 | 必填 | 说明 |
-|---|---|---|
-| `TELEGRAM_BOT_TOKEN` | 是 | @BotFather 创建机器人获得 |
-| `TELEGRAM_CHAT_ID` | 是 | 接收通知的用户 ID（@userinfobot 可查） |
-| `ALIYUN_USERS` | 是 | 被监控实例，多实例用 `\|` 分隔，见下 |
-| `ADMIN_USERS` | 否 | 控制机器人管理员用户 ID（逗号分隔），配置后启动机器人 |
-| `BARK_URL` | 否 | Bark 推送地址 |
-| `ALIYUN_MONITOR_FORCE_RECONFIG` | 否 | `1`=强制用环境变量重建配置 |
+| 变量 | 必填 | 默认 | 说明 |
+|---|---|---|---|
+| `TELEGRAM_BOT_TOKEN` | 是 | — | @BotFather 创建机器人获得 |
+| `TELEGRAM_CHAT_ID` | 是 | — | 接收通知的用户 ID（@userinfobot 可查） |
+| `ALIYUN_USERS` | 是 | — | 被监控实例，多实例用 `\|` 分隔，见下 |
+| `ADMIN_USERS` | 否 | — | 控制机器人管理员用户 ID（逗号分隔），配置后启动机器人 |
+| `BARK_URL` | 否 | — | Bark 推送地址 |
+| `ALIYUN_MONITOR_DATA` | 否 | `data` | 数据目录（config.json / 状态文件），容器内即 `/app/data` |
+| `ALIYUN_MONITOR_LOGS` | 否 | `logs` | 日志目录，容器内即 `/app/logs`。日志可选，目录不可写时仅输出到控制台 |
+| `ALIYUN_MONITOR_FORCE_RECONFIG` | 否 | `0` | `1`=强制用环境变量重建 config.json |
 
 ### ALIYUN_USERS 格式
 
@@ -68,17 +73,30 @@ docker compose logs -f ecs-guardian
 
 ### 使用配置文件（config.json）
 
-程序启动时读取 `$ALIYUN_MONITOR_DATA/config.json`（默认 `/data/config.json`）。以下两种方式任选：
+程序按以下优先级取配置：
 
-1. **环境变量注入**（默认）：首次启动由 entrypoint 渲染环境变量为 `/data/config.json`（见「快速开始」）。
-2. **直接提供配置**：把本仓库的 [config.example.json](config.example.json) 复制为 `config.json` 并填上真实值，挂载到数据卷（需要 `ALIYUN_MONITOR_FORCE_RECONFIG=0` 防止被环境变量覆盖）：
+1. **环境变量优先**：设置了 `ALIYUN_USERS` 就用环境变量构建配置，并写入 `<ALIYUN_MONITOR_DATA>/config.json`（默认 `data/config.json`，容器内 `/app/data/config.json`）。
+2. **回退读文件**：未设置环境变量时，读取该 config.json。
 
-   ```bash
-   cp config.example.json data/config.json && vim data/config.json
-   docker compose -f docker-compose.local.yml up -d
-   ```
+也可以直接提供配置文件：把 [config.example.json](config.example.json) 复制为 `data/config.json` 并填真实值：
 
-   > 配置字段与 `ALIYUN_USERS` 环境变量一一对应；完整字段说明见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 或环境变量一节。
+```bash
+cp config.example.json data/config.json && vim data/config.json
+docker compose -f docker-compose.local.yml up -d   # 用 docker compose 挂载 ./data 与 ./logs
+```
+
+> 配置字段与 `ALIYUN_USERS` 环境变量一一对应；完整字段说明见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
+
+### 日志
+
+日志为可选功能：默认同时输出到**控制台**（`docker logs` 可见）与**文件**。文件按天分级存放：
+
+```
+<ALIYUN_MONITOR_LOGS>/YYYYMM/DD.log          # 当天全部日志
+<ALIYUN_MONITOR_LOGS>/YYYYMM/DD.error.log    # 当天 error 级日志（单独一份）
+```
+
+例如 `logs/202610/20261005.log`。默认日志目录为 `logs`（容器内 `/app/logs`）；目录不可写时程序照常运行，只是不落盘。
 
 ### 使用可执行文件（直接运行，不依赖 Docker）
 
@@ -124,7 +142,7 @@ ALIYUN_MONITOR_DATA=/etc/ecs-guardian ./ecs-guardian
 ALIYUN_MONITOR_DATA=/etc/ecs-guardian ./ecs-guardian
 ```
 
-> 说明：`--config` 只改变配置文件的读取位置；日志与状态文件（`*.log` / `monitor_state.json` / `bot_state.json`）始终写入 `ALIYUN_MONITOR_DATA` 目录（默认 `/data`），请确保该目录可写。
+> 说明：`--config` 只改变配置文件的读取位置；状态文件（`monitor_state.json` / `bot_state.json`）写入 `ALIYUN_MONITOR_DATA` 目录（默认 `data`），日志写入 `ALIYUN_MONITOR_LOGS` 目录（默认 `logs`）。请确保这两个目录可写。
 
 常用子命令：
 

@@ -9,8 +9,9 @@
 //	ecs-guardian validate                            # 仅校验配置后退出
 //	ecs-guardian version                             # 打印版本号
 //
-// 配置路径优先级：--config 显式指定 > ALIYUN_MONITOR_DATA/config.json（默认 /data/config.json）。
-// 日志与状态文件（*.log / monitor_state.json / bot_state.json）始终写入 ALIYUN_MONITOR_DATA 目录。
+// 配置路径优先级：--config 显式指定 > ALIYUN_MONITOR_DATA/config.json（默认 data/config.json）。
+// 日志目录：ALIYUN_MONITOR_LOGS（默认 <data>/logs），按 YYYYMM/DD.log 与 DD.error.log 分级落盘，
+// 同时全部输出到控制台（stdout/stderr）。
 package main
 
 import (
@@ -20,6 +21,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/orangejx/ecs-guardian/internal/applog"
 	"github.com/orangejx/ecs-guardian/internal/bot"
 	"github.com/orangejx/ecs-guardian/internal/config"
 	"github.com/orangejx/ecs-guardian/internal/keeper"
@@ -42,11 +44,22 @@ func applyConfigPath(p *string) {
 	}
 }
 
+// setupLogging 初始化日志系统（控制台 + 分级文件），并让标准 log 包输出进入同一套机制。
+// dataDir: 数据目录（用于默认日志目录 <data>/logs）。
+func setupLogging() {
+	// 先初始化 applog（决定日志文件），再用 Hook 接管标准 log 输出
+	applog.Setup(config.DefaultDataDir(), config.DefaultLogsDir())
+	log.SetFlags(0)
+	log.SetOutput(applog.Hook{})
+}
+
 func main() {
+	setupLogging()
+
 	// 顶层 --config 形式：ecs-guardian --config <path> [validate|monitor|report|version]
 	if len(os.Args) >= 2 && (os.Args[1] == "--config" || os.Args[1] == "-config") {
 		if len(os.Args) < 3 {
-			log.Fatal("--config 需要一个文件路径参数")
+			applog.Fatalf("--config 需要一个文件路径参数")
 		}
 		config.ConfigOverride = os.Args[2]
 		sub := "server"
@@ -96,25 +109,24 @@ func runValidateCmd() {
 
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("配置校验失败: %v", err)
+		applog.Fatalf("配置校验失败: %v", err)
 	}
 	if err := cfg.Validate(); err != nil {
-		log.Fatalf("配置校验失败: %v", err)
+		applog.Fatalf("配置校验失败: %v", err)
 	}
 	fmt.Println("配置校验通过")
 }
 
 // runServer 常驻模式：巡检 + 日报 + 机器人。
 func runServer() {
-	log.SetFlags(log.LstdFlags | log.Lmsgprefix)
 	log.Printf("[main] 阿里云 CDT 流量监控 & 自动止损 (Go 版) 启动")
 
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("[main] 加载配置失败: %v", err)
+		applog.Fatalf("[main] 加载配置失败: %v", err)
 	}
 	if err := cfg.Validate(); err != nil {
-		log.Fatalf("[main] 配置校验失败: %v", err)
+		applog.Fatalf("[main] 配置校验失败: %v", err)
 	}
 
 	// 控制机器人（可选）：配置了 admin_users 才启动
@@ -140,7 +152,7 @@ func runServer() {
 	}()
 
 	if err := keeper.Run(keeper.Config{EnableReport: true}); err != nil {
-		log.Fatalf("[main] 常驻进程退出: %v", err)
+		applog.Fatalf("[main] 常驻进程退出: %v", err)
 	}
 }
 
@@ -152,11 +164,9 @@ func runMonitorOnceCmd() {
 	fs.Parse(os.Args[2:])
 	applyConfigPath(cfgPath)
 
-	if !*once {
-		// 与常驻行为一致：未显式 --once 时也执行一轮（历史兼容）
-	}
+	_ = once // 历史兼容：未传 --once 也执行一轮
 	if err := monitor.RunOnce(); err != nil {
-		log.Fatalf("[monitor] 巡检失败: %v", err)
+		applog.Fatalf("[monitor] 巡检失败: %v", err)
 	}
 }
 
@@ -168,10 +178,8 @@ func runReportNowCmd() {
 	fs.Parse(os.Args[2:])
 	applyConfigPath(cfgPath)
 
-	if !*now {
-		// 未传 --now 也直接发送（历史兼容）
-	}
+	_ = now // 历史兼容：未传 --now 也直接发送
 	if err := report.SendDaily(); err != nil {
-		log.Fatalf("[report] 日报发送失败: %v", err)
+		applog.Fatalf("[report] 日报发送失败: %v", err)
 	}
 }
