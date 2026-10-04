@@ -1,0 +1,16 @@
+# ecs-guardian docker compose 示例。
+# 用法：cp .env.example .env 并填写 → docker compose up -d
+# 配置保存在 ./data/config.json，重建容器不会丢失；需要重建配置时设置 FORCE_RECONFIG=1 再 up。
+#
+# 发布流程使用 GitHub Actions 自动构建并推送镜像（见 .github/workflows/release.yml）：
+#   - 推 tag vX.Y.Z → 构建 linux/amd64 + linux/arm64 → 发布 Release + Docker Hub + GHCR
+# 开发环境（本地构建）：
+#   docker compose -f docker-compose.local.yml up -d
+services:
+  ecs-guardian:
+    image: orangejx/ecs-guardian:latest
+    container_name: ecs-guardian
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./data:/data

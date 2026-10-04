@@ -1,0 +1,124 @@
+name: release
+
+# 触发方式：推送 v 开头的 git tag，例如：
+#   git tag v1.0.0 && git push origin v1.0.0
+# 动作：
+#   1. 编译 linux/amd64 + linux/arm64 静态可执行文件
+#   2. 创建 GitHub Release 并上传二进制（含 SHA256SUMS）
+#   3. 构建 linux/amd64 + linux/arm64 双架构 Docker 镜像
+#   4. 推送镜像到 GHCR（必须）与 Docker Hub（可选）
+#
+# 首次使用前需要配置仓库 Secrets：
+#   - 必须：无（GHCR 用 GITHUB_TOKEN 自动鉴权）
+#   - 可选：DOCKERHUB_USERNAME / DOCKERHUB_TOKEN（不配则只发 GHCR）
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  # GHCR 镜像名直接用仓库路径，例如 ghcr.io/<owner>/<repo>
+  GHCR_IMAGE: ghcr.io/${{ github.repository }}
+  # Docker Hub 用户名来自 Secret，未配置则跳过 Docker Hub 推送
+  DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write      # 创建 Release、上传资产
+      packages: write      # 推送 GHCR 镜像
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Compute version
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      # ---- 1. 编译可执行文件 ----
+      - name: Build binaries (linux/amd64 + linux/arm64)
+        run: |
+          mkdir -p dist
+          for arch in amd64 arm64; do
+            CGO_ENABLED=0 GOOS=linux GOARCH=${arch} \
+              go build -trimpath \
+                -ldflags="-s -w -X main.version=${{ steps.version.outputs.version }}" \
+                -o dist/ecs-guardian-linux-${arch} .
+          done
+          (cd dist && sha256sum ecs-guardian-* > SHA256SUMS)
+
+      # ---- 2. Docker 多架构构建环境 ----
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ---- 3. 登录 registry ----
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to Docker Hub
+        if: env.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # ---- 4. 计算镜像 tags ----
+      - name: Compute image tags
+        id: tags
+        run: |
+          V="${{ steps.version.outputs.version }}"
+          TAGS="${{ env.GHCR_IMAGE }}:latest
+${{ env.GHCR_IMAGE }}:${V}"
+          if [ -n "$DOCKERHUB_USERNAME" ]; then
+            TAGS="$TAGS
+docker.io/${DOCKERHUB_USERNAME}/ecs-guardian:latest
+docker.io/${DOCKERHUB_USERNAME}/ecs-guardian:${V}"
+          fi
+          echo "tags=$TAGS" >> "$GITHUB_OUTPUT"
+          echo "----- 本次将推送的镜像 tags -----"
+          echo "$TAGS"
+
+      # ---- 5. 构建并推送双架构镜像 ----
+      - name: Build and push Docker images
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          build-args: VERSION=${{ steps.version.outputs.version }}
+
+      # ---- 6. 创建 GitHub Release ----
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ecs-guardian ${{ steps.version.outputs.version }}
+          files: |
+            dist/ecs-guardian-linux-amd64
+            dist/ecs-guardian-linux-arm64
+            dist/SHA256SUMS
+          generate_release_notes: true
+          body: |
+            ## ecs-guardian ${{ steps.version.outputs.version }}
+
+            Docker 镜像（linux/amd64 + linux/arm64）：
+            - GHCR: `${{ env.GHCR_IMAGE }}:${{ steps.version.outputs.version }}`
+            ${{ env.DOCKERHUB_USERNAME != '' && format('- Docker Hub: `docker.io/{0}/ecs-guardian:{1}`', env.DOCKERHUB_USERNAME, steps.version.outputs.version) || '' }}
+
+            使用方式见 [README](https://github.com/${{ github.repository }}/#readme)。
+
+            本项目源自 [10000ge10000/aliyun_monitor](https://github.com/10000ge10000/aliyun_monitor)。

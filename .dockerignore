@@ -1,0 +1,6 @@
+# 构建上下文排除项
+data/
+.env
+*.log
+.github/
+.dockerignore

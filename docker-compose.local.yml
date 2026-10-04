@@ -1,0 +1,14 @@
+# 本地开发用：从源码构建镜像（对应发布流程里的 orangejx/ecs-guardian:latest）。
+# 用法：docker compose -f docker-compose.local.yml up -d
+services:
+  ecs-guardian:
+    build:
+      context: .
+      # 需要 arm64+amd64 双架构本地构建时改用 buildx：
+      #   docker buildx build --platform linux/amd64,linux/arm64 -t orangejx/ecs-guardian:latest --load .
+    image: orangejx/ecs-guardian:latest
+    container_name: ecs-guardian
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./data:/data
