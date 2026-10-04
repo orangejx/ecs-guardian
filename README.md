@@ -96,6 +96,22 @@ cp config.example.json /etc/ecs-guardian/config.json && vim /etc/ecs-guardian/co
 ALIYUN_MONITOR_DATA=/etc/ecs-guardian ./ecs-guardian
 ```
 
+配置路径有三种指定方式（优先级从高到低）：
+
+```bash
+# 1) 顶层 --config 直接指定配置文件（推荐，配置文件可在任意位置/任意命名）
+./ecs-guardian --config /path/to/my-config.json
+
+# 2) 子命令风格：--config 挂在子命令后
+./ecs-guardian validate --config /path/to/my-config.json
+./ecs-guardian monitor --once --config /path/to/my-config.json
+
+# 3) 环境变量指定配置目录（config.json 固定放在该目录下）
+ALIYUN_MONITOR_DATA=/etc/ecs-guardian ./ecs-guardian
+```
+
+> 说明：`--config` 只改变配置文件的读取位置；日志与状态文件（`*.log` / `monitor_state.json` / `bot_state.json`）始终写入 `ALIYUN_MONITOR_DATA` 目录（默认 `/data`），请确保该目录可写。
+
 常用子命令：
 
 ```bash
@@ -104,6 +120,7 @@ ALIYUN_MONITOR_DATA=/etc/ecs-guardian ./ecs-guardian
 ./ecs-guardian monitor --once          # 立即执行一轮巡检后退出（验证配置/鉴权）
 ./ecs-guardian report --now            # 立即发送一次日报
 ./ecs-guardian                         # 常驻：每5分钟巡检 + 每日09:00日报 + 控制机器人(可选)
+./ecs-guardian --config my.json        # 常驻 + 显式指定配置文件
 ```
 
 配合 systemd 长期运行（可选）：

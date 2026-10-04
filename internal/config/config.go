@@ -48,6 +48,10 @@ type Config struct {
 	Users      []UserConfig   `json:"users"`
 }
 
+// ConfigOverride 是全局配置路径覆盖（由 main 解析 --config 设置）。
+// 优先级：--config 显式指定 > ALIYUN_MONITOR_DATA/config.json（默认 /data/config.json）。
+var ConfigOverride string
+
 // DefaultDataDir 返回数据目录（环境变量 ALIYUN_MONITOR_DATA，默认 /data）。
 func DefaultDataDir() string {
 	if d := os.Getenv("ALIYUN_MONITOR_DATA"); d != "" {
@@ -56,8 +60,11 @@ func DefaultDataDir() string {
 	return "/data"
 }
 
-// ConfigPath 返回 config.json 的路径。
+// ConfigPath 返回 config.json 的路径。设置了 --config 时优先使用该路径。
 func ConfigPath() string {
+	if ConfigOverride != "" {
+		return ConfigOverride
+	}
 	return filepath.Join(DefaultDataDir(), "config.json")
 }
 
