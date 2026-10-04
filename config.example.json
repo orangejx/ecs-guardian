@@ -1,0 +1,40 @@
+{
+  "telegram": {
+    "bot_token": "123456789:AAF...",
+    "chat_id": "123456789"
+  },
+  "admin_users": [
+    123456789
+  ],
+  "bark": {
+    "bark_url": "https://api.day.app/your-key"
+  },
+  "users": [
+    {
+      "name": "HK-Server",
+      "ak": "LTAI...",
+      "sk": "your-access-key-secret",
+      "region": "cn-hongkong",
+      "instance_id": "i-xxxxxxxxxxxxx",
+      "traffic_limit": 180,
+      "quota": 200,
+      "bill_endpoint": "business.aliyuncs.com",
+      "currency": "¥",
+      "resgroup": "",
+      "paused": false
+    },
+    {
+      "name": "SG-Server",
+      "ak": "LTAI...",
+      "sk": "your-access-key-secret",
+      "region": "ap-southeast-1",
+      "instance_id": "i-yyyyyyyyyyyyy",
+      "traffic_limit": 100,
+      "quota": 200,
+      "bill_endpoint": "business.ap-southeast-1.aliyuncs.com",
+      "currency": "$",
+      "resgroup": "",
+      "paused": false
+    }
+  ]
+}

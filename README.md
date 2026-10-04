@@ -66,6 +66,21 @@ docker compose up -d          # 拉取镜像运行（发布版）
 docker compose logs -f ecs-guardian
 ```
 
+### 使用配置文件（config.json）
+
+程序启动时读取 `$ALIYUN_MONITOR_DATA/config.json`（默认 `/data/config.json`）。以下两种方式任选：
+
+1. **环境变量注入**（默认）：首次启动由 entrypoint 渲染环境变量为 `/data/config.json`（见「快速开始」）。
+2. **直接提供配置**：把本仓库的 [config.example.json](config.example.json) 复制为 `config.json` 并填上真实值，挂载到数据卷（需要 `ALIYUN_MONITOR_FORCE_RECONFIG=0` 防止被环境变量覆盖）：
+
+   ```bash
+   cp config.example.json data/config.json && vim data/config.json
+   docker compose -f docker-compose.local.yml up -d
+   ```
+
+   > 配置字段与 `ALIYUN_USERS` 环境变量一一对应；完整字段说明见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 或环境变量一节。
+```
+
 ## 手动构建（多架构）
 
 ```bash
