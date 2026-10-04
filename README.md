@@ -2,9 +2,6 @@
 
 阿里云 ECS **自动保活** 守护进程 —— 用 Go 实现，单静态二进制运行。为按量/抢占式 ECS 提供「流量止损 + 自动复活」，并通过 **Telegram** 推送告警与每日日报、远程控制开关机。
 
-- 作者：orangejx · 网站：<https://wlms.dev>
-- 仓库：<https://github.com/orangejx/ecs-guardian>
-
 ## 它做什么
 
 - **自动复活**：每 5 分钟巡检一次。流量安全（未超过阈值）且实例处于 `Stopped` 时，自动调用 `StartInstance` 并轮询等待进入 `Running`。账号欠费被停机后，充上钱的下一个巡检周期内自动开机，无需手动干预。
