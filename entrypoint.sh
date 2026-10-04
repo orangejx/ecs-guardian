@@ -49,6 +49,13 @@ PY
     # 解析 "name=..,ak=..,sk=..,region=..,instance_id=..,traffic_limit=.. [| ...]"
     parse_users() {
         [ -z "${ALIYUN_USERS:-}" ] && { echo "[]"; return; }
+        # 防御：某些 docker compose 版本不会剥掉 .env 中 ALIYUN_USERS 两端成对的单/双引号，
+        # 导致第一个条目前缀 `'`、最后一个条目的 currency 后缀 `'`，进而 name 丢失、
+        # currency=$' 不匹配。这里在整体值层面先剥离两端成对引号。
+        case "$ALIYUN_USERS" in
+            \'*\') ALIYUN_USERS=$(echo "$ALIYUN_USERS" | sed -e "s/^'//" -e "s/'$//") ;;
+            \"*\") ALIYUN_USERS=$(echo "$ALIYUN_USERS" | sed -e 's/^"//' -e 's/"$//') ;;
+        esac
         USER_LIST=""
         OLD_IFS="$IFS"; IFS='|'
         for entry in $ALIYUN_USERS; do
