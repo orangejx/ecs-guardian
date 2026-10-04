@@ -15,21 +15,21 @@ import (
 
 // 与 Python 版 monitor.py 一致的参数
 const (
-	notifyCooldown       = time.Hour            // 通用事件通知冷却：1 小时内不重复
-	overlimitCooldown    = 24 * time.Hour       // 流量超标提醒冷却：24 小时一次
-	startWaitTimeout     = 180 * time.Second    // 等待实例启动轮询超时
-	startPollInterval    = 10 * time.Second     // 启动轮询间隔
-	userCheckTimeout     = startWaitTimeout + 120*time.Second // 单实例巡检硬超时
-	maxStartFailures     = 3                    // 连续启动失败达到此值后降频重试
-	resourceRetryCooldown = 30 * time.Minute    // 资源不足重试冷却
-	checkFailureThreshold = 3                   // 连续巡检失败告警阈值
+	notifyCooldown        = time.Hour                          // 通用事件通知冷却：1 小时内不重复
+	overlimitCooldown     = 24 * time.Hour                     // 流量超标提醒冷却：24 小时一次
+	startWaitTimeout      = 180 * time.Second                  // 等待实例启动轮询超时
+	startPollInterval     = 10 * time.Second                   // 启动轮询间隔
+	userCheckTimeout      = startWaitTimeout + 120*time.Second // 单实例巡检硬超时
+	maxStartFailures      = 3                                  // 连续启动失败达到此值后降频重试
+	resourceRetryCooldown = 30 * time.Minute                   // 资源不足重试冷却
+	checkFailureThreshold = 3                                  // 连续巡检失败告警阈值
 )
 
 // InstanceState 是单个实例的持久化状态（写入 monitor_state.json）。
 type InstanceState struct {
-	StartFailures int       `json:"start_failures,omitempty"`
-	LastRetry     time.Time `json:"last_retry_ts,omitempty"`
-	CheckFailures int       `json:"check_failures,omitempty"`
+	StartFailures int                  `json:"start_failures,omitempty"`
+	LastRetry     time.Time            `json:"last_retry_ts,omitempty"`
+	CheckFailures int                  `json:"check_failures,omitempty"`
 	LastNotify    map[string]time.Time `json:"last_notify,omitempty"`
 }
 

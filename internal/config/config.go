@@ -88,29 +88,52 @@ func ConfigPath() string {
 	return filepath.Join(DefaultDataDir(), "config.json")
 }
 
-// Load 加载配置。优先级：
-//  1. 环境变量（TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID / ALIYUN_USERS / ADMIN_USERS / BARK_URL），
-//     只要 ALIYUN_USERS 非空就优先使用，并尝试写入 config.json（持久化）。
-//     写入失败（如目录只读）只告警，不中断——环境变量配置照样生效。
-//  2. 否则读取 config.json（--config 或 ALIYUN_MONITOR_DATA/config.json）。
+// Load 加载配置。
+//
+// 流程（各级结果都会写入日志与日志文件）：
+//  1. 先尝试加载环境变量；成功则提示「环境变量加载成功」，并把配置写入 config.json 持久化。
+//  2. 环境变量加载失败时不提示，继续尝试加载配置文件。
+//  3. 配置文件加载成功则提示「配置文件加载成功」。
+//  4. 两者都失败时，同时提示环境变量与配置文件均加载失败。
+//
+// 说明：此处只负责"加载"（解析出配置结构），不做完整有效性校验；
+// 字段是否合法由调用方通过 Validate() 判定。
 func Load() (*Config, error) {
+	var envErr error
+
 	if EnvPrecedence {
-		if cfg, ok, err := LoadFromEnv(); err != nil {
-			return nil, err
-		} else if ok {
-			// 环境变量提供了完整配置：尝试写入配置文件以便下次快速启动 / 便于排查。
-			// 写入失败不致命（例如 data 目录只读），仅记录日志。
-			if err := cfg.Save(); err != nil {
-				log.Printf("[config] 写入配置文件失败（不影响运行）: %v", err)
+		cfg, ok, err := LoadFromEnv()
+		switch {
+		case ok && err == nil:
+			log.Printf("[config] 环境变量加载成功（%d 个实例）", len(cfg.Users))
+			// 持久化：写入失败不致命（如目录只读），仅记录。
+			if saveErr := cfg.Save(); saveErr != nil {
+				log.Printf("[config] 写入配置文件失败（不影响运行）: %v", saveErr)
 			}
 			return cfg, nil
+		case !ok:
+			envErr = fmt.Errorf("未设置 ALIYUN_USERS 环境变量")
+		default:
+			envErr = err
 		}
+		// 环境变量加载失败：此处不单独提示，等配置文件也失败时一并提示。
 	}
-	return LoadFromFile()
+
+	fileCfg, fileErr := LoadFromFile()
+	if fileErr == nil {
+		log.Printf("[config] 配置文件加载成功（%s，%d 个实例）", ConfigPath(), len(fileCfg.Users))
+		return fileCfg, nil
+	}
+
+	// 两者都失败：同时提示
+	if envErr != nil {
+		log.Printf("[config] 环境变量加载失败: %v", envErr)
+	}
+	log.Printf("[config] 配置文件加载失败（%s）: %v", ConfigPath(), fileErr)
+	return nil, fmt.Errorf("环境变量与配置文件均加载失败：%v；%s: %v", envErr, ConfigPath(), fileErr)
 }
 
-// LoadFromEnv 从环境变量解析配置。返回 ok=false 表示环境变量不完整（未设置 ALIYUN_USERS），
-// 此时应回退到读取配置文件。
+// LoadFromEnv 从环境变量解析配置。ok=false 表示未提供 ALIYUN_USERS（应回退到配置文件）。
 func LoadFromEnv() (*Config, bool, error) {
 	raw := strings.TrimSpace(os.Getenv("ALIYUN_USERS"))
 	if raw == "" {
@@ -171,8 +194,10 @@ func parseAdminUsers(raw string) []int64 {
 //
 //	name=备注,ak=..,sk=..,region=..,instance_id=..,traffic_limit=180,resgroup=..,bill_endpoint=..,currency=¥|$ | ...
 //
-// 条目用 | 分隔，字段用 , 分隔。ak/sk/region/instance_id 必填；currency=$ 且未指定
-// bill_endpoint 时默认国际站账单节点。
+// 条目用 | 分隔，字段用 , 分隔。currency=$ 且未指定 bill_endpoint 时默认国际站账单节点。
+//
+// 本函数只做"加载"（解析出结构），不校验字段有效性——缺失的 ak/sk/region/instance_id
+// 留空，由调用方通过 Validate() 判定。只有整串解析不出任何条目时才返回错误。
 func ParseUsers(raw string) ([]UserConfig, error) {
 	var users []UserConfig
 	for _, entry := range strings.Split(raw, "|") {
@@ -196,18 +221,12 @@ func ParseUsers(raw string) ([]UserConfig, error) {
 			fields[strings.TrimSpace(key)] = strings.TrimSpace(value)
 		}
 
-		ak := fields["ak"]
-		sk := fields["sk"]
-		region := fields["region"]
 		instanceID := fields["instance_id"]
 		if instanceID == "" {
 			instanceID = fields["instance"]
 		}
 		if instanceID == "" {
 			instanceID = fields["id"]
-		}
-		if ak == "" || sk == "" || region == "" || instanceID == "" {
-			return nil, fmt.Errorf("ALIYUN_USERS 条目字段缺失（需要 ak/sk/region/instance_id）: %s", entry)
 		}
 
 		currency := fields["currency"]
@@ -238,9 +257,9 @@ func ParseUsers(raw string) ([]UserConfig, error) {
 
 		users = append(users, UserConfig{
 			Name:         fields["name"],
-			AK:           ak,
-			SK:           sk,
-			Region:       region,
+			AK:           fields["ak"],
+			SK:           fields["sk"],
+			Region:       fields["region"],
 			InstanceID:   instanceID,
 			TrafficLimit: limit,
 			Quota:        200,

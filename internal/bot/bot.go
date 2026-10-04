@@ -51,10 +51,10 @@ type State struct {
 
 // Bot 控制机器人实例。
 type Bot struct {
-	cfg      *config.Config
-	botAPI   *tgbotapi.BotAPI
-	mu       sync.Mutex
-	state    *State
+	cfg       *config.Config
+	botAPI    *tgbotapi.BotAPI
+	mu        sync.Mutex
+	state     *State
 	statePath string
 }
 
@@ -348,10 +348,10 @@ func (b *Bot) handleCallback(cb *tgbotapi.CallbackQuery) {
 func (b *Bot) operationKeyboard(idx int) tgbotapi.InlineKeyboardMarkup {
 	base := fmt.Sprintf("op%d", idx)
 	rows := [][]tgbotapi.InlineKeyboardButton{
-		{tgbotapi.NewInlineKeyboardButtonData("开机", base + "_start")},
-		{tgbotapi.NewInlineKeyboardButtonData("关机", base + "_stop")},
-		{tgbotapi.NewInlineKeyboardButtonData("重启", base + "_reboot")},
-		{tgbotapi.NewInlineKeyboardButtonData("状态", base + "_status")},
+		{tgbotapi.NewInlineKeyboardButtonData("开机", base+"_start")},
+		{tgbotapi.NewInlineKeyboardButtonData("关机", base+"_stop")},
+		{tgbotapi.NewInlineKeyboardButtonData("重启", base+"_reboot")},
+		{tgbotapi.NewInlineKeyboardButtonData("状态", base+"_status")},
 		{tgbotapi.NewInlineKeyboardButtonData("返回", "back")},
 	}
 	return tgbotapi.NewInlineKeyboardMarkup(rows...)

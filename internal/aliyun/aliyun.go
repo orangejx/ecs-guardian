@@ -46,8 +46,8 @@ type CDTQueryParams struct {
 
 // Client 封装访问阿里云所需的凭据与客户端。
 type Client struct {
-	AK   string
-	SK   string
+	AK string
+	SK string
 	// Region 用于创建 ECS/BSS 客户端（仅影响 RegionId 参数与默认域名）
 	Region string
 
