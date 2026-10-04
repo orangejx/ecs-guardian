@@ -58,27 +58,30 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Compute image tags
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: |
-            ghcr.io/${{ env.IMAGE_NAME }}
-            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/ecs-guardian
-          tags: |
-            type=raw,value=latest
-            type=raw,value=${{ steps.version.outputs.version }}
-          flavor: |
-            latest=auto
-
-      - name: Build and push images
+      # GHCR 始终推送（public 仓库 + GITHUB_TOKEN 即可）
+      - name: Build and push images (GHCR)
         uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
           build-args: VERSION=${{ steps.version.outputs.version }}
+          tags: |
+            ghcr.io/${{ env.IMAGE_NAME }}:latest
+            ghcr.io/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
+
+      # Docker Hub 推送：仅在配置了 secrets 时执行
+      - name: Build and push images (Docker Hub)
+        if: env.DOCKERHUB_USERNAME != ''
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: VERSION=${{ steps.version.outputs.version }}
+          tags: |
+            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/ecs-guardian:latest
+            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/ecs-guardian:${{ steps.version.outputs.version }}
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
