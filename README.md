@@ -82,12 +82,26 @@ docker compose logs -f ecs-guardian
 
 ### 使用可执行文件（直接运行，不依赖 Docker）
 
-从 GitHub **Release** 下载 `ecs-guardian-linux-amd64`（x86_64 服务器）或 `ecs-guardian-linux-arm64`（ARM 服务器），也可以本机 `go build` 编译：
+从 GitHub **Release** 下载 `ecs-guardian-linux-amd64`（x86_64 服务器）或 `ecs-guardian-linux-arm64`（ARM 服务器），也可以本机用 `make` 或 `go build` 编译：
+
+```bash
+# 方式一：make（推荐，自动安装依赖并编译）
+make deps && make build          # 编译当前平台，输出 bin/ecs-guardian
+make build-all                   # 交叉编译 linux/amd64 + linux/arm64
+make test                        # 编译 + go vet + 校验配置样例
+make version                     # 编译并打印版本号
+make run CONFIG=/path/to/config.json   # 编译后直接常驻运行
+
+# 方式二：直接 go build
+go build -o ecs-guardian .
+```
+
+> Makefile 的 `VERSION` 默认取最近 git tag（去 `v` 前缀），可覆盖：`make build VERSION=0.0.2`。
 
 ```bash
 # 下载（替换成对应版本号）
 curl -fsSL -o ecs-guardian \
-  https://github.com/orangejx/ecs-guardian/releases/download/v0.0.1/ecs-guardian-linux-amd64
+  https://github.com/orangejx/ecs-guardian/releases/download/v0.0.2/ecs-guardian-linux-amd64
 chmod +x ecs-guardian
 
 # 快速启动：指定配置目录（config.json 放在该目录下）后直接运行，默认常驻
