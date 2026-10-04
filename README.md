@@ -79,7 +79,59 @@ docker compose logs -f ecs-guardian
    ```
 
    > 配置字段与 `ALIYUN_USERS` 环境变量一一对应；完整字段说明见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 或环境变量一节。
+
+### 使用可执行文件（直接运行，不依赖 Docker）
+
+从 GitHub **Release** 下载 `ecs-guardian-linux-amd64`（x86_64 服务器）或 `ecs-guardian-linux-arm64`（ARM 服务器），也可以本机 `go build` 编译：
+
+```bash
+# 下载（替换成对应版本号）
+curl -fsSL -o ecs-guardian \
+  https://github.com/orangejx/ecs-guardian/releases/download/v0.0.1/ecs-guardian-linux-amd64
+chmod +x ecs-guardian
+
+# 快速启动：指定配置目录（config.json 放在该目录下）后直接运行，默认常驻
+mkdir -p /etc/ecs-guardian
+cp config.example.json /etc/ecs-guardian/config.json && vim /etc/ecs-guardian/config.json
+ALIYUN_MONITOR_DATA=/etc/ecs-guardian ./ecs-guardian
 ```
+
+常用子命令：
+
+```bash
+./ecs-guardian version                 # 查看版本
+./ecs-guardian validate                # 仅校验配置后退出（排查配置问题用）
+./ecs-guardian monitor --once          # 立即执行一轮巡检后退出（验证配置/鉴权）
+./ecs-guardian report --now            # 立即发送一次日报
+./ecs-guardian                         # 常驻：每5分钟巡检 + 每日09:00日报 + 控制机器人(可选)
+```
+
+配合 systemd 长期运行（可选）：
+
+```ini
+# /etc/systemd/system/ecs-guardian.service
+[Unit]
+Description=ecs-guardian
+After=network-online.target
+
+[Service]
+Type=simple
+Environment=ALIYUN_MONITOR_DATA=/etc/ecs-guardian
+ExecStart=/usr/local/bin/ecs-guardian
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo cp ecs-guardian /usr/local/bin/
+sudo systemctl daemon-reload && sudo systemctl enable --now ecs-guardian
+journalctl -u ecs-guardian -f        # 查看日志
+```
+
+> 配置目录里程序会自动创建 `config.json` 之外的日志与状态文件（`*.log` / `monitor_state.json` / `bot_state.json`），请确保该目录可写。
 
 ## 手动构建（多架构）
 
