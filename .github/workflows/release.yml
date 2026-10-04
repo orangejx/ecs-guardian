@@ -11,6 +11,8 @@ permissions:
 
 env:
   IMAGE_NAME: ${{ github.repository }}
+  # 将 Secret 映射为 env，供 if 判断是否推送 Docker Hub
+  DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
 
 jobs:
   release:
