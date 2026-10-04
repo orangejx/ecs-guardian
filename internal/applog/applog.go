@@ -82,11 +82,13 @@ func Setup(dataDir, logsDirOverride string) {
 	initialized = true
 }
 
-// openFilesForDate 按当天日期打开日志文件（YYYYMM/DD.log 与 DD.error.log）。
+// openFilesForDate 按当天日期打开日志文件：<logs>/YYYYMM/DD.log 与 DD.error.log。
+// 例如 2026-10-05 → <logs>/202610/05.log 与 05.error.log。
 func openFilesForDate(now time.Time) {
-	month := now.Format("200601")
-	day := now.Format("20060102")
-	if openDate == day && openMonth == month && infoWriter != nil {
+	month := now.Format("200601") // YYYYMM，作为子目录名
+	day := now.Format("02")       // DD，作为文件名
+	dateKey := now.Format("20060102")
+	if openDate == dateKey && openMonth == month && infoWriter != nil {
 		return
 	}
 	dir := filepath.Join(logsDir, month)
@@ -109,7 +111,7 @@ func openFilesForDate(now time.Time) {
 	} else {
 		errorWriter = errF
 	}
-	openDate = day
+	openDate = dateKey
 	openMonth = month
 }
 

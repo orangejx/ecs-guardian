@@ -96,7 +96,7 @@ docker compose -f docker-compose.local.yml up -d   # 用 docker compose 挂载 .
 <ALIYUN_MONITOR_LOGS>/YYYYMM/DD.error.log    # 当天 error 级日志（单独一份）
 ```
 
-例如 `logs/202610/20261005.log`。默认日志目录为 `logs`（容器内 `/app/logs`）；目录不可写时程序照常运行，只是不落盘。
+例如 `logs/202610/05.log`（2026 年 10 月 5 日）。默认日志目录为 `logs`（容器内 `/app/logs`）；目录不可写时程序照常运行，只是不落盘。
 
 ### 使用可执行文件（直接运行，不依赖 Docker）
 
